@@ -3,7 +3,7 @@
 A work-inprogress, the current implementation is a simplified end-to-end verifiable (E2E-V) voting system. It demonstrates the core concepts of secure electronic voting, including client-side encryption, token-based authentication, and public ballot verification. Uses python and javascript via a flask app.
 
 As of right now, changes must be made to every security property mentioned under the project 2 design instructions. The following are necessary security properties:
-- secure authentication before voting       Not Done
+- secure authentication before voting       Done
 - secrecy (votes are private)               Done
 - individual verifiability                  Not Done
 - universal verifiability                   Not Done
