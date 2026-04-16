@@ -46,8 +46,13 @@ def public_key():
 # API: issue voting token
 # -----------------------------
 @app.route("/api/token", methods=["POST"])
+@login_required
 def issue_token():
+    if current_user.has_voted:
+        return jsonify({"error": "Already voted"}), 403
+
     token = auth.issue_token()
+
     return jsonify({"token": token})
 
 
@@ -55,27 +60,46 @@ def issue_token():
 # API: submit encrypted ballot
 # -----------------------------
 @app.route("/api/vote", methods=["POST"])
+@login_required
 def submit_vote():
     data = request.get_json()
+    token = data.get("token")
 
-    # 1. check auth
-    user_id = current_user.id
+    # -------------------------
+    # 1. Validate token
+    # -------------------------
+    if not auth.validate_token(token):
+        return jsonify({"status": "rejected"})
 
-    # 2. check if already voted
-    existing = Vote.query.filter_by(user_id=user_id).first()
-    if existing:
-        return jsonify({"status": "rejected", "reason": "already voted"})
+    # -------------------------
+    # 2. Hash token (receipt)
+    # -------------------------
+    token_hash = auth.hash_token(token)
 
-    # 3. call crypto system
-    result = voting.submit_ballot(data)
+    # -------------------------
+    # 3. Store vote
+    # -------------------------
+    vote = Vote(
+        token_hash=token_hash,
+        ballot_hash=json.dumps(data.get("ciphertext"))
+    )
 
-    if result:
-        # 4. record vote
-        vote = Vote(user_id=user_id, ballot_hash = json.dumps(data.get("ciphertext")))
-        db.session.add(vote)
-        db.session.commit()
+    db.session.add(vote)
 
-    return jsonify({"status": "accepted" if result else "rejected"})
+    # -------------------------
+    # 4. Mark user as voted
+    # -------------------------
+    current_user.has_voted = True
+
+    db.session.commit()
+
+    # -------------------------
+    # 5. Return receipt
+    # -------------------------
+    return jsonify({
+        "status": "accepted",
+        "receipt": token_hash
+    })
 
 
 # -----------------------------
@@ -87,8 +111,8 @@ def get_board():
 
     return jsonify([
         {
-            "ciphertext": json.loads(v.ballot_hash),
-            "hash": v.ballot_hash
+            "receipt": v.token_hash,
+            "ciphertext": json.loads(v.ballot_hash)
         }
         for v in votes
     ])

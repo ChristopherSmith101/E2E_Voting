@@ -1,9 +1,13 @@
 import uuid
+import hashlib
 
 class AuthServer:
     def __init__(self):
         self.tokens = set()
 
+    def hash_token(self, token):
+        return hashlib.sha256(token.encode()).hexdigest()
+    
     def issue_token(self):
         token = str(uuid.uuid4())
         self.tokens.add(token)

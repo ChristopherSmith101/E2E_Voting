@@ -43,7 +43,6 @@ async function castVote(vote) {
 
   status.innerText = "Preparing ballot...";
 
-  // ensure system is ready
   if (!token || !pk) {
     status.innerText = "System not ready yet...";
     return;
@@ -55,24 +54,33 @@ async function castVote(vote) {
   const ballot = {
     ciphertext,
     proof,
-    token   // <-- SAME token reused every time
+    token
   };
 
   status.innerText = "Submitting vote...";
 
-  const res = await fetch("/api/vote", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(ballot)
-  });
+  try {
+    const res = await fetch("/api/vote", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(ballot)
+    });
 
-  const data = await res.json();
+    const data = await res.json();
 
-  if (data.status === "accepted") {
-    status.innerText = "Vote accepted!";
-  } else {
-    status.innerText = "Vote rejected.";
+    if (data.status === "accepted") {
+      const receipt = data.receipt;
+
+      localStorage.setItem("vote_receipt", receipt);
+
+      status.innerText = "Vote accepted!";
+      alert("Vote cast! Save this receipt: " + receipt);
+    } else {
+      status.innerText = "Vote rejected.";
+    }
+
+  } catch (err) {
+    console.error(err);
+    status.innerText = "Error submitting vote.";
   }
 }
