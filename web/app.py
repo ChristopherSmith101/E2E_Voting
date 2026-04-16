@@ -83,16 +83,14 @@ def submit_vote():
 # -----------------------------
 @app.route("/api/board", methods=["GET"])
 def get_board():
-    ballots = board.list_ballots()
+    votes = Vote.query.all()
 
-    # make JSON-safe output
     return jsonify([
         {
-            "ciphertext": b.ciphertext,
-            "proof": b.proof,
-            "hash": b.hash()
+            "ciphertext": json.loads(v.ballot_hash),
+            "hash": v.ballot_hash
         }
-        for b in ballots
+        for v in votes
     ])
 
 
