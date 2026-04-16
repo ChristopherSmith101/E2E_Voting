@@ -7,7 +7,7 @@ import json
 from crypto import keygen
 from bulletin_board import BulletinBoard
 from auth import AuthServer
-from verify_server import VotingServer  # renamed module
+from verify_server import VotingServer
 
 app = Flask(__name__)
 
@@ -28,7 +28,7 @@ def load_user(user_id):
 # -----------------------------
 # Global election state (simple prototype)
 # -----------------------------
-sk, pk = keygen() # RESETS WHEN SERVER RESTARTS, MUST BE CHANGED
+sk, pk = keygen() # RESETS WHEN SERVER RESTARTS, MUST BE CHANGED!!!!!!!!!!!!!!!!!!!!
 
 board = BulletinBoard()
 auth = AuthServer()
@@ -66,7 +66,7 @@ def submit_vote():
     if existing:
         return jsonify({"status": "rejected", "reason": "already voted"})
 
-    # 3. call crypto system (your existing logic)
+    # 3. call crypto system
     result = voting.submit_ballot(data)
 
     if result:
