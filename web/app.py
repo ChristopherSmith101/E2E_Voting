@@ -127,6 +127,16 @@ def results():
     result = tally(board.list_ballots(), sk)
     return jsonify({"result": result})
 
+# -----------------------------
+# API: get current_user voting state
+# -----------------------------
+@app.route("/api/status", methods=["GET"])
+@login_required
+def status():
+    return jsonify({
+        "has_voted": current_user.has_voted
+    })
+
 
 # -----------------------------
 # Simple frontend entries
