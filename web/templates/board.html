@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bulletin Board</title>
+</head>
+<body>
+    <h2>Public Bulletin Board</h2>
+
+    <button onclick="loadBoard()">Refresh</button>
+	<div><a href="/">Home Page</a></div>
+
+    <pre id="board"></pre>
+
+    <script>
+        async function loadBoard() {
+            const res = await fetch("/api/board");
+            const data = await res.json();
+
+            document.getElementById("board").innerText =
+                JSON.stringify(data, null, 2);
+        }
+
+        // auto-load on page open
+        loadBoard();
+    </script>
+</body>
+</html>
