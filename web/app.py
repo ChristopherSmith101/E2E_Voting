@@ -3,21 +3,35 @@ from flask_login import LoginManager, login_user, logout_user, login_required, c
 from web.models import db, User, Vote
 from werkzeug.security import generate_password_hash, check_password_hash
 import json
+import os
+from authlib.integrations.flask_client import OAuth
 
 from crypto import keygen
 from bulletin_board import BulletinBoard
 from auth import AuthServer
 from verify_server import VotingServer
+import dotenv
 
 app = Flask(__name__)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = "login"
+login_manager.login_view = "login_page"
 
-app.secret_key = "dev-secret"
+app.secret_key = os.getenv("FLASK_SECRET_KEY")
+
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///app.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+oauth = OAuth(app)
+
+google = oauth.register(
+    name="google",
+    client_id=os.getenv("GOOGLE_CLIENT_ID"),
+    client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+    server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+    client_kwargs={"scope": "openid email profile"}
+)
 
 db.init_app(app)
 
@@ -137,6 +151,36 @@ def status():
         "has_voted": current_user.has_voted
     })
 
+# -----------------------------
+# OAuth Routes
+# -----------------------------
+@app.route("/auth/start")
+def auth_start():
+    redirect_uri = url_for("auth_callback", _external=True)
+    return google.authorize_redirect(redirect_uri)
+
+@app.route("/auth/callback")
+def auth_callback():
+    token = google.authorize_access_token()
+
+    userinfo = google.userinfo()
+
+    email = userinfo["email"]
+    google_id = userinfo["sub"]
+
+    user = User.query.filter_by(google_id=google_id).first()
+
+    if not user:
+        user = User(
+            google_id=google_id,
+            username=email
+        )
+        db.session.add(user)
+        db.session.commit()
+
+    login_user(user)
+
+    return redirect(url_for("home"))
 
 # -----------------------------
 # Simple frontend entries
@@ -163,36 +207,40 @@ def register():
         db.session.add(new_user)
         db.session.commit()
 
-        return redirect(url_for("login"))
+        return redirect(url_for("login_page"))
 
     return render_template("register.html")
 
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
+# @app.route("/login", methods=["GET", "POST"])
+# def login():
+#     if request.method == "POST":
+#         username = request.form.get("username")
+#         password = request.form.get("password")
 
-        user = User.query.filter_by(username=username).first()
+#         user = User.query.filter_by(username=username).first()
 
-        if not user or not check_password_hash(user.password, password):
-            return render_template(
-                "login.html",
-                error="Invalid credentials, try again",
-                username=username
-            )
+#         if not user or not check_password_hash(user.password, password):
+#             return render_template(
+#                 "login.html",
+#                 error="Invalid credentials, try again",
+#                 username=username
+#             )
 
-        login_user(user)
+#         login_user(user)
 
-        next_page = request.args.get("next")
-        return redirect(next_page or url_for("home"))
+#         next_page = request.args.get("next")
+#         return redirect(next_page or url_for("home"))
 
+#     return render_template("login.html")
+
+@app.route("/login")
+def login_page():
     return render_template("login.html")
 
 @app.route("/logout")
 def logout():
     logout_user()
-    return redirect(url_for("login"))
+    return redirect(url_for("login_page"))
 
 @app.route("/vote")
 @login_required
