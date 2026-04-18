@@ -7,7 +7,7 @@ As of right now, changes must be made to every security property mentioned under
 - secrecy (votes are private)               Done
 - individual verifiability                  Done
 - universal verifiability                   Done
-- anti-coercion                             Not Done
+- anti-coercion                             Done
 - integrity                                 Weak (needs to be changed)
 
 ---
@@ -16,17 +16,20 @@ As of right now, changes must be made to every security property mentioned under
 
 To run the application, first create a virtual environment from the project root using "python -m venv venv", which will generate a local environment folder named venv. Then activate the environment using "source venv/bin/activate" on Linux, macOS, or WSL, or "venv\Scripts\activate" on Windows Command Prompt, or "venv\Scripts\Activate.ps1" on PowerShell. After activation, install all required dependencies with "pip install -r requirements.txt". Once the setup is complete, start the Flask application by running "python -m web.app", and then open your browser to http://127.0.0.1:5000 to interact with the system through localhost.
 
+## Common issue
+
+If the app is having errors it most commonly is an issue with the database being outdated, in order to fix this press Ctrl C to stop the app, then run rm web/instance/app.db, then rerun the app again with python -m web.app
+
 ## ⚙️ Overview
 
 The system allows users to:
 
 - Obtain a one-time voting token
 - Encrypt their vote in the browser
-- Submit an encrypted ballot to the server
+- Submit an encrypted ballot to the server that can either be real or a dummy ballot
 - Have the server verify and record the ballot
 - Prevent multiple voting using single-use tokens
 
-The system is EXTREMELY basic and does not even have functionality to show the current votes or anything.
 
 ---
 
