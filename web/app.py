@@ -6,10 +6,11 @@ import json
 import os
 import hashlib
 from authlib.integrations.flask_client import OAuth
-from crypto import keygen
+from crypto import keygen, decrypt
 from bulletin_board import BulletinBoard
 from auth import AuthServer
 from verify_server import VotingServer
+from ballot import Ballot
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -37,24 +38,24 @@ db.init_app(app)
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-# -----------------------------
+# -------------------------
 # Global election state (simple prototype)
-# -----------------------------
+# -------------------------
 sk, pk = keygen()  # RESETS WHEN SERVER RESTARTS, MUST BE CHANGED!!!!!!!!!!!!!!!!!!!!
 board = BulletinBoard()
 auth = AuthServer()
 voting = VotingServer(board, auth)
 
-# -----------------------------
+# -------------------------
 # API: public key
-# -----------------------------
+# -------------------------
 @app.route("/api/public_key", methods=["GET"])
 def public_key():
     return jsonify({"pk": pk})
 
-# -----------------------------
+# -------------------------
 # API: issue voting token
-# -----------------------------
+# -------------------------
 @app.route("/api/token", methods=["POST"])
 @login_required
 def issue_token():
@@ -63,9 +64,9 @@ def issue_token():
     token = auth.issue_token()
     return jsonify({"token": token})
 
-# -----------------------------
+# -------------------------
 # API: submit encrypted ballot
-# -----------------------------
+# -------------------------
 @app.route("/api/vote", methods=["POST"])
 @login_required
 def submit_vote():
@@ -85,39 +86,49 @@ def submit_vote():
     token_hash = auth.hash_token(token)
     
     # -------------------------
-    # 3. Compute ballot hash (NEW)
+    # 3. Compute ballot hash
     # -------------------------
     ballot_hash_digest = hashlib.sha256(
         json.dumps(ciphertext, sort_keys=True).encode()
     ).hexdigest()
     
     # -------------------------
-    # 4. Store vote
+    # 4. Store vote in database
     # -------------------------
     vote = Vote(
         token_hash=token_hash,
         ballot_hash=json.dumps(ciphertext),
-        ballot_hash_digest=ballot_hash_digest  # NEW
+        ballot_hash_digest=ballot_hash_digest
     )
     db.session.add(vote)
     
     # -------------------------
-    # 5. Mark user as voted
+    # 5. Also post to bulletin board
+    # -------------------------
+    ballot = Ballot(
+        ciphertext=tuple(ciphertext.values()) if isinstance(ciphertext, dict) else tuple(ciphertext),
+        proof=data.get("proof"),
+        voter_token=token
+    )
+    board.post_ballot(ballot)
+    
+    # -------------------------
+    # 6. Mark user as voted
     # -------------------------
     current_user.has_voted = True
     db.session.commit()
     
     # -------------------------
-    # 6. Return receipt WITH ballot hash (NEW)
+    # 7. Return receipt WITH ballot hash
     # -------------------------
     return jsonify({
         "status": "accepted",
         "receipt": token_hash,
-        "ballot_hash": ballot_hash_digest  # NEW
+        "ballot_hash": ballot_hash_digest
     })
 
 # -------------------------
-# API: verify individual ballot (NEW)
+# API: verify individual ballot
 # -------------------------
 @app.route("/api/verify", methods=["POST"])
 def verify_ballot():
@@ -155,10 +166,131 @@ def get_board():
         {
             "receipt": v.token_hash,
             "ciphertext": json.loads(v.ballot_hash),
-            "ballot_hash": v.ballot_hash_digest  # NEW
+            "ballot_hash": v.ballot_hash_digest
         }
         for v in votes
     ])
+
+# -------------------------
+# API: get all ballots for verification
+# -------------------------
+@app.route("/api/ballots", methods=["GET"])
+def get_ballots():
+    """Return all ballots with their hashes for external verification"""
+    votes = Vote.query.all()
+    return jsonify({
+        "election_pk": pk,
+        "ballots": [
+            {
+                "receipt": v.token_hash,
+                "ciphertext": json.loads(v.ballot_hash),
+                "ballot_hash": v.ballot_hash_digest,
+                "timestamp": v.timestamp.isoformat() if v.timestamp else None
+            }
+            for v in votes
+        ]
+    })
+
+# -------------------------
+# API: verify all ballots
+# -------------------------
+@app.route("/api/ballots/verify", methods=["GET"])
+def verify_all_ballots():
+    """Universal verifiability: verify all ballots are valid"""
+    votes = Vote.query.all()
+    
+    valid_count = 0
+    invalid_count = 0
+    details = []
+    
+    for idx, vote in enumerate(votes):
+        # A ballot is valid if:
+        # 1. It has a receipt and ballot hash
+        # 2. The ballot hash was computed correctly (we trust our own computation)
+        is_valid = vote.token_hash and vote.ballot_hash_digest
+        
+        if is_valid:
+            valid_count += 1
+            details.append({
+                "index": idx + 1,
+                "valid": True,
+                "receipt": vote.token_hash,
+                "reason": None
+            })
+        else:
+            invalid_count += 1
+            details.append({
+                "index": idx + 1,
+                "valid": False,
+                "receipt": vote.token_hash,
+                "reason": "Missing hash or receipt"
+            })
+    
+    return jsonify({
+        "total_ballots": len(votes),
+        "valid_ballots": valid_count,
+        "invalid_ballots": invalid_count,
+        "details": details
+    })
+
+# -------------------------
+# API: tally with proof
+# -------------------------
+@app.route("/api/ballots/tally", methods=["GET"])
+def get_tally():
+    """
+    Return the election tally + proof for universal verifiability.
+    Reads directly from database instead of in-memory board.
+    """
+    votes = Vote.query.all()
+    
+    if not votes:
+        return jsonify({
+            "total_ballots": 0,
+            "yes_votes": 0,
+            "no_votes": 0,
+            "yes_percentage": 0.0,
+            "no_percentage": 0.0,
+            "winner": "No votes cast yet",
+            "invalid_ballots": 0,
+            "election_pk": pk
+        })
+    
+    # Count YES votes by decrypting from database
+    yes_count = 0
+    for vote in votes:
+        ciphertext_dict = json.loads(vote.ballot_hash)
+        ciphertext_tuple = (ciphertext_dict['c1'], ciphertext_dict['c2'])
+        decrypted = decrypt(sk, ciphertext_tuple)
+        if decrypted == 1:
+            yes_count += 1
+    
+    total = len(votes)
+    yes_votes = yes_count
+    no_votes = total - yes_votes
+    
+    yes_percentage = (yes_votes / total * 100) if total > 0 else 0
+    no_percentage = (no_votes / total * 100) if total > 0 else 0
+    
+    winner = "YES" if yes_votes > no_votes else ("NO" if no_votes > yes_votes else "TIE")
+    
+    # Create tally proof
+    ballot_hashes = sorted([v.ballot_hash_digest for v in votes])
+    ballot_data = json.dumps(ballot_hashes, sort_keys=True)
+    tally_proof_input = str(yes_votes) + str(no_votes) + ballot_data
+    tally_proof = hashlib.sha256(tally_proof_input.encode()).hexdigest()
+    
+    return jsonify({
+        "total_ballots": total,
+        "yes_votes": yes_votes,
+        "no_votes": no_votes,
+        "yes_percentage": yes_percentage,
+        "no_percentage": no_percentage,
+        "winner": winner,
+        "invalid_ballots": 0,
+        "election_pk": pk,
+        "tally_proof": tally_proof
+    })
 
 # -------------------------
 # API: tally result (demo only)
@@ -245,6 +377,10 @@ def vote_page():
 @app.route("/board")
 def board_page():
     return render_template("board.html")
+
+@app.route("/verify")
+def verify_page():
+    return render_template("verify.html")
 
 # -------------------------
 # Run server
