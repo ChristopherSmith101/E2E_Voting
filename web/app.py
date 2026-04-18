@@ -401,4 +401,9 @@ def verify_page():
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
-    app.run(debug=True)
+    
+    # Fetch the port from environment variables, defaulting to 5000 if not set
+    port = int(os.environ.get("PORT", 5000))
+    host = int(os.environ.get("HOST"))
+
+    app.run(host=host, port=port, debug=True)
