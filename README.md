@@ -16,7 +16,7 @@ As of right now, changes must be made to every security property mentioned under
 
 ## Running the App
 
-Quick Start Command: "Set-ExecutionPolicy Bypass -Scope Process -Force; ./sbuild.ps1"
+Quick Start Command: "Set-ExecutionPolicy Bypass -Scope Process -Force; ./build.ps1"
    Then: ".\venv\Scripts\python.exe -m web.app"
 
 If that doesn't work:
