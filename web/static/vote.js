@@ -1,5 +1,6 @@
-let token = null;   // <-- stored once
-let pk = null;      // <-- stored once
+let token = null;
+let pk = null;
+let hasVoted = false;
 
 // -----------------------------
 // Load public key once
@@ -8,6 +9,12 @@ async function loadPublicKey() {
   const res = await fetch("/api/public_key");
   const data = await res.json();
   pk = data.pk;
+}
+
+async function loadStatus() {
+  const res = await fetch("/api/status");
+  const data = await res.json();
+  hasVoted = data.has_voted;
 }
 
 // -----------------------------
@@ -26,8 +33,16 @@ async function initToken() {
 // Initialization (run once)
 // -----------------------------
 async function init() {
+  await loadStatus();
+
+  if (hasVoted) {
+    document.getElementById("status").innerText = "You have already voted.";
+    return; // IMPORTANT: stop initialization if already voted
+  }
+
   await loadPublicKey();
   await initToken();
+
   console.log("Client initialized");
 }
 
@@ -38,14 +53,22 @@ init();
 // -----------------------------
 // Main voting function
 // -----------------------------
-async function castVote(vote) {
+async function castVote(vote, isDummy = false) {
   const status = document.getElementById("status");
 
-  status.innerText = "Preparing ballot...";
+  const voteType = isDummy ? "dummy" : "real";
+  status.innerHTML = `Preparing ${voteType} ballot...`;
+  status.className = "info";
 
-  // ensure system is ready
+  if (hasVoted) {
+    status.innerHTML = "Vote rejected (already voted).";
+    status.className = "error";
+    return;
+  }
+
   if (!token || !pk) {
-    status.innerText = "System not ready yet...";
+    status.innerHTML = "System not ready yet...";
+    status.className = "error";
     return;
   }
 
@@ -55,24 +78,40 @@ async function castVote(vote) {
   const ballot = {
     ciphertext,
     proof,
-    token   // <-- SAME token reused every time
+    token,
+    is_dummy: isDummy
   };
 
-  status.innerText = "Submitting vote...";
+  status.innerHTML = isDummy ? "Submitting dummy ballot..." : "Submitting real vote...";
+  status.className = "info";
 
-  const res = await fetch("/api/vote", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(ballot)
-  });
+  try {
+    const res = await fetch("/api/vote", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(ballot)
+    });
 
-  const data = await res.json();
+    const data = await res.json();
 
-  if (data.status === "accepted") {
-    status.innerText = "Vote accepted!";
-  } else {
-    status.innerText = "Vote rejected.";
+    if (data.status === "accepted") {
+      const receipt = data.receipt;
+      const ballot_hash = data.ballot_hash;
+
+      localStorage.setItem("vote_receipt", receipt);
+      localStorage.setItem("ballot_hash", ballot_hash);
+
+      const voteLabel = isDummy ? "dummy" : "real";
+      status.innerHTML = `✓ ${voteLabel.charAt(0).toUpperCase() + voteLabel.slice(1)} ballot cast!<br><br>Save this receipt:<br><code>${receipt}</code><br><br>Ballot Hash:<br><code>${ballot_hash}</code>`;
+      status.className = "success";
+    } else {
+      status.innerHTML = "Ballot rejected.";
+      status.className = "error";
+    }
+
+  } catch (err) {
+    console.error(err);
+    status.innerHTML = "Error submitting ballot.";
+    status.className = "error";
   }
 }
