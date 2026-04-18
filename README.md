@@ -5,7 +5,7 @@ A work-inprogress, the current implementation is a simplified end-to-end verifia
 As of right now, changes must be made to every security property mentioned under the project 2 design instructions. The following are necessary security properties:
 - secure authentication before voting       Done
 - secrecy (votes are private)               Done
-- individual verifiability                  Not Done
+- individual verifiability                  Done
 - universal verifiability                   Not Done
 - anti-coercion                             Not Done
 - integrity                                 Weak (needs to be changed)
