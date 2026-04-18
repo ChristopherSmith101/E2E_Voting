@@ -6,7 +6,7 @@ As of right now, changes must be made to every security property mentioned under
 - secure authentication before voting       Done
 - secrecy (votes are private)               Done
 - individual verifiability                  Done
-- universal verifiability                   Not Done
+- universal verifiability                   Done
 - anti-coercion                             Not Done
 - integrity                                 Weak (needs to be changed)
 
