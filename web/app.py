@@ -356,23 +356,6 @@ def auth_callback():
 def home():
     return render_template("index.html")
 
-@app.route("/register", methods=["GET", "POST"])
-def register():
-    if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
-        existing = User.query.filter_by(username=username).first()
-        if existing:
-            return "User already exists", 400
-        new_user = User(
-            username=username,
-            password=generate_password_hash(password)
-        )
-        db.session.add(new_user)
-        db.session.commit()
-        return redirect(url_for("login_page"))
-    return render_template("register.html")
-
 @app.route("/login")
 def login_page():
     return render_template("login.html")
