@@ -14,4 +14,5 @@ class Vote(db.Model):
     token_hash = db.Column(db.String(256), unique=True, nullable=False)
     timestamp = db.Column(db.DateTime, default=db.func.now())
     ballot_hash = db.Column(db.String(256))
-    ballot_hash_digest = db.Column(db.String(64))  # NEW: hash of the ciphertext
+    ballot_hash_digest = db.Column(db.String(64))
+    is_dummy = db.Column(db.Boolean, default=False)
