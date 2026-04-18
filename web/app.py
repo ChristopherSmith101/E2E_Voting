@@ -404,6 +404,6 @@ if __name__ == "__main__":
     
     # Fetch the port from environment variables, defaulting to 5000 if not set
     port = int(os.environ.get("PORT", 5000))
-    host = int(os.environ.get("HOST"))
+    host = int(os.environ.get("HOST", "127.0.0.1"))
 
     app.run(host=host, port=port, debug=True)
