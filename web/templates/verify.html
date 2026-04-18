@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Audit Election - Universal Verifiability</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        .header {
+            background: #f0f0f0;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .section {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .ballot {
+            background: #f9f9f9;
+            border-left: 4px solid #007bff;
+            padding: 10px;
+            margin: 5px 0;
+        }
+        .valid {
+            border-left-color: #28a745;
+            background: #f0fff4;
+        }
+        .invalid {
+            border-left-color: #dc3545;
+            background: #fff5f5;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .stat-box {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .loading {
+            text-align: center;
+            color: #666;
+            padding: 20px;
+        }
+        .error {
+            background: #fff5f5;
+            border: 1px solid #dc3545;
+            color: #dc3545;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .success {
+            background: #f0fff4;
+            border: 1px solid #28a745;
+            color: #28a745;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        code {
+            background: #f5f5f5;
+            padding: 2px 5px;
+            border-radius: 3px;
+            word-break: break-all;
+        }
+        .anti-coercion-note {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔍 Election Audit - Universal Verifiability</h1>
+        <p>Anyone can verify that all ballots are valid and counted correctly.</p>
+        <p><strong>Election Public Key:</strong> <code id="pk"></code></p>
+    </div>
+
+    <div class="anti-coercion-note">
+        <strong>Anti-Coercion Protection:</strong> This election uses dummy ballots to protect against coercion. Dummy ballots are counted separately and do not affect the election result. The tally below shows only real votes.
+    </div>
+
+    <div class="section">
+        <h2>Verification Options</h2>
+        <button onclick="verifyAllBallots()">✓ Verify All Ballots</button>
+        <button onclick="downloadBallots()">⬇ Download Raw Ballots</button>
+        <button onclick="viewTally()">📊 View Tally</button>
+        <button onclick="location.href='/'">← Home</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        // Load public key on page load
+        async function loadPublicKey() {
+            try {
+                const res = await fetch("/api/public_key");
+                const data = await res.json();
+                document.getElementById("pk").textContent = data.pk;
+            } catch (e) {
+                console.error("Error loading public key:", e);
+            }
+        }
+
+        // ============================================================
+        // VERIFY ALL BALLOTS - Universal Verifiability Check
+        // ============================================================
+        async function verifyAllBallots() {
+            const resultsDiv = document.getElementById("results");
+            resultsDiv.innerHTML = '<div class="loading">Verifying ballots...</div>';
+
+            try {
+                const res = await fetch("/api/ballots/verify");
+                const data = await res.json();
+
+                let html = `
+                    <div class="section">
+                        <h2>Ballot Verification Results</h2>
+                        <div class="stats">
+                            <div class="stat-box">
+                                <div class="stat-number">${data.total_ballots}</div>
+                                <div class="stat-label">Total Ballots</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-number" style="color: #28a745;">${data.valid_ballots}</div>
+                                <div class="stat-label">Valid ✓</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-number" style="color: #dc3545;">${data.invalid_ballots}</div>
+                                <div class="stat-label">Invalid ✗</div>
+                            </div>
+                        </div>
+                `;
+
+                if (data.invalid_ballots === 0 && data.total_ballots > 0) {
+                    html += '<p style="color: #28a745; font-weight: bold;">✓ All ballots are valid!</p>';
+                } else if (data.total_ballots === 0) {
+                    html += '<p style="color: #666;">No ballots yet.</p>';
+                } else {
+                    html += '<p style="color: #dc3545;">⚠ Some ballots failed verification!</p>';
+                }
+
+                // Show detailed results
+                html += '<h3>Ballot Details</h3>';
+                if (data.details.length === 0) {
+                    html += '<p>No ballots to display.</p>';
+                } else {
+                    data.details.forEach(ballot => {
+                        const statusClass = ballot.valid ? 'valid' : 'invalid';
+                        const statusIcon = ballot.valid ? '✓' : '✗';
+                        html += `
+                            <div class="ballot ${statusClass}">
+                                <strong>${statusIcon} Ballot #${ballot.index}</strong><br>
+                                Receipt: <code>${ballot.receipt.substring(0, 16)}...</code><br>
+                                ${ballot.reason ? `Reason: ${ballot.reason}` : 'Valid ballot'}
+                            </div>
+                        `;
+                    });
+                }
+
+                html += '</div>';
+                resultsDiv.innerHTML = html;
+            } catch (e) {
+                resultsDiv.innerHTML = `<div class="error">Error verifying ballots: ${e.message}</div>`;
+            }
+        }
+
+        // ============================================================
+        // DOWNLOAD BALLOTS - For External Verification
+        // ============================================================
+        async function downloadBallots() {
+            try {
+                const res = await fetch("/api/ballots");
+                const data = await res.json();
+
+                // Create downloadable JSON file
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "election_ballots.json";
+                a.click();
+                URL.revokeObjectURL(url);
+
+                const resultsDiv = document.getElementById("results");
+                resultsDiv.innerHTML = `<div class="success">✓ Downloaded election_ballots.json with ${data.ballots.length} ballots</div>`;
+            } catch (e) {
+                const resultsDiv = document.getElementById("results");
+                resultsDiv.innerHTML = `<div class="error">Error downloading ballots: ${e.message}</div>`;
+            }
+        }
+
+        // ============================================================
+        // VIEW TALLY - Public Vote Count
+        // ============================================================
+        async function viewTally() {
+            const resultsDiv = document.getElementById("results");
+            resultsDiv.innerHTML = '<div class="loading">Loading tally...</div>';
+
+            try {
+                const res = await fetch("/api/ballots/tally");
+                const data = await res.json();
+
+                let html = `
+                    <div class="section">
+                        <h2>Election Tally</h2>
+                        <div class="stats">
+                            <div class="stat-box">
+                                <div class="stat-number">${data.real_ballots}</div>
+                                <div class="stat-label">Real Ballots</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-number" style="color: #28a745;">${data.yes_votes}</div>
+                                <div class="stat-label">YES (${data.yes_percentage.toFixed(1)}%)</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-number" style="color: #dc3545;">${data.no_votes}</div>
+                                <div class="stat-label">NO (${data.no_percentage.toFixed(1)}%)</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-number" style="color: #999;">${data.dummy_ballots}</div>
+                                <div class="stat-label">Dummy Ballots</div>
+                            </div>
+                        </div>
+                        
+                        <p><strong>Winner: ${data.winner}</strong></p>
+                        <p><em>Dummy Ballots (not counted): ${data.dummy_ballots}</em></p>
+                        
+                        <h3>How to Verify This Tally</h3>
+                        <ol>
+                            <li>Download all ballots using the "Download Raw Ballots" button</li>
+                            <li>For each ballot, verify the ballot hash was computed correctly from the encrypted ciphertext</li>
+                            <li>Decrypt each ballot using your own copy of the election software and the election public key</li>
+                            <li>Manually count the YES/NO votes from the decrypted ballots</li>
+                            <li>Verify your count matches this published tally: ${data.yes_votes} YES, ${data.no_votes} NO (using only real ballots)</li>
+                        </ol>
+                        
+                        <h3>Anti-Coercion Note</h3>
+                        <p>This election uses dummy ballots to protect against coercion. ${data.dummy_ballots} dummy ballots were submitted but do not count toward the result.</p>
+                        
+                        <h3>Election Public Key</h3>
+                        <p><code>${data.election_pk}</code></p>
+
+                        <h3>Tally Proof (Commitments)</h3>
+                        <p><code>${data.tally_proof}</code></p>
+                        <p><small>This hash commits the server to the current tally and set of real ballots. If either changes, the hash will differ.</small></p>
+                    </div>
+                `;
+
+                resultsDiv.innerHTML = html;
+            } catch (e) {
+                resultsDiv.innerHTML = `<div class="error">Error loading tally: ${e.message}</div>`;
+            }
+        }
+
+        // Load on page open
+        loadPublicKey();
+    </script>
+</body>
+</html>
