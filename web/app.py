@@ -73,6 +73,7 @@ def submit_vote():
     data = request.get_json()
     token = data.get("token")
     ciphertext = data.get("ciphertext")
+    is_dummy = data.get("is_dummy", False)  # NEW: anti-coercion flag
     
     # -------------------------
     # 1. Validate token
@@ -98,7 +99,8 @@ def submit_vote():
     vote = Vote(
         token_hash=token_hash,
         ballot_hash=json.dumps(ciphertext),
-        ballot_hash_digest=ballot_hash_digest
+        ballot_hash_digest=ballot_hash_digest,
+        is_dummy=is_dummy  # NEW
     )
     db.session.add(vote)
     
@@ -124,7 +126,8 @@ def submit_vote():
     return jsonify({
         "status": "accepted",
         "receipt": token_hash,
-        "ballot_hash": ballot_hash_digest
+        "ballot_hash": ballot_hash_digest,
+        "is_dummy": is_dummy  # NEW
     })
 
 # -------------------------
@@ -153,6 +156,7 @@ def verify_ballot():
         "status": "verified",
         "message": "Your ballot is recorded on the bulletin board",
         "receipt": receipt,
+        "is_dummy": vote.is_dummy,
         "timestamp": vote.timestamp.isoformat() if vote.timestamp else None
     })
 
@@ -241,31 +245,38 @@ def get_tally():
     """
     Return the election tally + proof for universal verifiability.
     Reads directly from database instead of in-memory board.
+    Excludes dummy votes from tally.
     """
     votes = Vote.query.all()
     
-    if not votes:
+    # Count real votes (exclude dummies)
+    real_votes = [v for v in votes if not v.is_dummy]
+    dummy_votes = [v for v in votes if v.is_dummy]
+    
+    if not real_votes:
         return jsonify({
-            "total_ballots": 0,
+            "total_ballots": len(votes),
+            "real_ballots": 0,
+            "dummy_ballots": len(dummy_votes),
             "yes_votes": 0,
             "no_votes": 0,
             "yes_percentage": 0.0,
             "no_percentage": 0.0,
-            "winner": "No votes cast yet",
+            "winner": "No real votes cast yet",
             "invalid_ballots": 0,
             "election_pk": pk
         })
     
-    # Count YES votes by decrypting from database
+    # Count YES votes by decrypting from database (skip dummy votes)
     yes_count = 0
-    for vote in votes:
+    for vote in real_votes:
         ciphertext_dict = json.loads(vote.ballot_hash)
         ciphertext_tuple = (ciphertext_dict['c1'], ciphertext_dict['c2'])
         decrypted = decrypt(sk, ciphertext_tuple)
         if decrypted == 1:
             yes_count += 1
     
-    total = len(votes)
+    total = len(real_votes)
     yes_votes = yes_count
     no_votes = total - yes_votes
     
@@ -275,13 +286,15 @@ def get_tally():
     winner = "YES" if yes_votes > no_votes else ("NO" if no_votes > yes_votes else "TIE")
     
     # Create tally proof
-    ballot_hashes = sorted([v.ballot_hash_digest for v in votes])
+    ballot_hashes = sorted([v.ballot_hash_digest for v in real_votes])
     ballot_data = json.dumps(ballot_hashes, sort_keys=True)
     tally_proof_input = str(yes_votes) + str(no_votes) + ballot_data
     tally_proof = hashlib.sha256(tally_proof_input.encode()).hexdigest()
     
     return jsonify({
-        "total_ballots": total,
+        "total_ballots": len(votes),
+        "real_ballots": len(real_votes),
+        "dummy_ballots": len(dummy_votes),
         "yes_votes": yes_votes,
         "no_votes": no_votes,
         "yes_percentage": yes_percentage,

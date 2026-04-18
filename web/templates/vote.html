@@ -4,67 +4,89 @@
   <title>Vote</title>
   <script src="/static/crypto.js"></script>
   <script src="/static/vote.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 20px;
+    }
+    .section {
+      border: 1px solid #ddd;
+      padding: 20px;
+      margin: 20px 0;
+      border-radius: 5px;
+    }
+    button {
+      background: #007bff;
+      color: white;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin: 5px;
+      font-size: 14px;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    .dummy-btn {
+      background: #999;
+    }
+    .dummy-btn:hover {
+      background: #666;
+    }
+    #status {
+      margin-top: 20px;
+      padding: 10px;
+      border-radius: 5px;
+      font-weight: bold;
+    }
+    .success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    .info {
+      background: #d1ecf1;
+      color: #0c5460;
+      border: 1px solid #bee5eb;
+    }
+    hr {
+      margin: 30px 0;
+    }
+  </style>
 </head>
 
 <body>
   <h2>Cast your vote</h2>
 
-  <button onclick="castVote(1)">YES</button>
-  <button onclick="castVote(0)">NO</button>
+  <div class="section">
+    <h3>Cast Your Real Vote</h3>
+    <p>Your real vote will count toward the election result and remain private.</p>
+    <button onclick="castVote(1, false)">YES (Real Vote)</button>
+    <button onclick="castVote(0, false)">NO (Real Vote)</button>
+  </div>
 
-  <p id="status"></p>
-
-  <!-- NEW: Verification section -->
   <hr>
-  <h3>Verify Your Ballot</h3>
-  <p>Already voted? Check if your ballot is on the board:</p>
-  <input type="text" id="verify_receipt" placeholder="Receipt" style="width: 400px;">
-  <input type="text" id="verify_hash" placeholder="Ballot Hash" style="width: 400px;">
-  <button onclick="verifyBallot()">Verify</button>
-  <p id="verify_status"></p>
 
-  <div><a href="/">Home Page</a></div>
+  <div class="section">
+    <h3>Cast a Dummy Vote (Anti-Coercion)</h3>
+    <p>If someone tries to coerce you to vote a certain way, you can cast a dummy vote to show them while keeping your real vote secret.</p>
+    <p><strong>Dummy votes do not count</strong> toward the election result and cannot be distinguished from real votes on the public bulletin board.</p>
+    <button class="dummy-btn" onclick="castVote(1, true)">YES (Dummy)</button>
+    <button class="dummy-btn" onclick="castVote(0, true)">NO (Dummy)</button>
+  </div>
 
-  <script>
-    // NEW: Verify ballot
-    async function verifyBallot() {
-      const receipt = document.getElementById("verify_receipt").value;
-      const ballot_hash = document.getElementById("verify_hash").value;
-      const status = document.getElementById("verify_status");
+  <div id="status"></div>
 
-      if (!receipt || !ballot_hash) {
-        status.innerText = "Please enter both receipt and ballot hash.";
-        return;
-      }
-
-      try {
-        const res = await fetch("/api/verify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ receipt, ballot_hash })
-        });
-
-        const data = await res.json();
-
-        if (data.status === "verified") {
-          status.innerText = "✓ Verified! Your ballot is on the board.";
-          status.style.color = "green";
-        } else {
-          status.innerText = "✗ Verification failed: " + data.message;
-          status.style.color = "red";
-        }
-      } catch (err) {
-        status.innerText = "Error verifying ballot.";
-      }
-    }
-
-    // NEW: Auto-load saved receipt/hash
-    window.addEventListener("load", () => {
-      const saved_receipt = localStorage.getItem("vote_receipt");
-      const saved_hash = localStorage.getItem("ballot_hash");
-      if (saved_receipt) document.getElementById("verify_receipt").value = saved_receipt;
-      if (saved_hash) document.getElementById("verify_hash").value = saved_hash;
-    });
-  </script>
+  <div style="margin-top: 30px;">
+    <a href="/">Home Page</a>
+  </div>
 </body>
 </html>

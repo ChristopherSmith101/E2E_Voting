@@ -53,18 +53,22 @@ init();
 // -----------------------------
 // Main voting function
 // -----------------------------
-async function castVote(vote) {
+async function castVote(vote, isDummy = false) {
   const status = document.getElementById("status");
 
-  status.innerText = "Preparing ballot...";
+  const voteType = isDummy ? "dummy" : "real";
+  status.innerHTML = `Preparing ${voteType} ballot...`;
+  status.className = "info";
 
   if (hasVoted) {
-    status.innerText = "Vote rejected (already voted).";
+    status.innerHTML = "Vote rejected (already voted).";
+    status.className = "error";
     return;
   }
 
   if (!token || !pk) {
-    status.innerText = "System not ready yet...";
+    status.innerHTML = "System not ready yet...";
+    status.className = "error";
     return;
   }
 
@@ -74,10 +78,12 @@ async function castVote(vote) {
   const ballot = {
     ciphertext,
     proof,
-    token
+    token,
+    is_dummy: isDummy
   };
 
-  status.innerText = "Submitting vote...";
+  status.innerHTML = isDummy ? "Submitting dummy ballot..." : "Submitting real vote...";
+  status.className = "info";
 
   try {
     const res = await fetch("/api/vote", {
@@ -90,23 +96,22 @@ async function castVote(vote) {
 
     if (data.status === "accepted") {
       const receipt = data.receipt;
-      const ballot_hash = data.ballot_hash;  // NEW
+      const ballot_hash = data.ballot_hash;
 
       localStorage.setItem("vote_receipt", receipt);
-      localStorage.setItem("ballot_hash", ballot_hash);  // NEW
+      localStorage.setItem("ballot_hash", ballot_hash);
 
-      status.innerText = "Vote accepted!";
-      alert(
-        "Vote cast! Save this receipt:\n\n" +
-        "Receipt: " + receipt + "\n" +
-        "Ballot Hash: " + ballot_hash  // NEW
-      );
+      const voteLabel = isDummy ? "dummy" : "real";
+      status.innerHTML = `✓ ${voteLabel.charAt(0).toUpperCase() + voteLabel.slice(1)} ballot cast!<br><br>Save this receipt:<br><code>${receipt}</code><br><br>Ballot Hash:<br><code>${ballot_hash}</code>`;
+      status.className = "success";
     } else {
-      status.innerText = "Vote rejected.";
+      status.innerHTML = "Ballot rejected.";
+      status.className = "error";
     }
 
   } catch (err) {
     console.error(err);
-    status.innerText = "Error submitting vote.";
+    status.innerHTML = "Error submitting ballot.";
+    status.className = "error";
   }
 }
