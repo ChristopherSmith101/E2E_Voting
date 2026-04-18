@@ -13,6 +13,58 @@
   <button onclick="castVote(0)">NO</button>
 
   <p id="status"></p>
+
+  <!-- NEW: Verification section -->
+  <hr>
+  <h3>Verify Your Ballot</h3>
+  <p>Already voted? Check if your ballot is on the board:</p>
+  <input type="text" id="verify_receipt" placeholder="Receipt" style="width: 400px;">
+  <input type="text" id="verify_hash" placeholder="Ballot Hash" style="width: 400px;">
+  <button onclick="verifyBallot()">Verify</button>
+  <p id="verify_status"></p>
+
   <div><a href="/">Home Page</a></div>
+
+  <script>
+    // NEW: Verify ballot
+    async function verifyBallot() {
+      const receipt = document.getElementById("verify_receipt").value;
+      const ballot_hash = document.getElementById("verify_hash").value;
+      const status = document.getElementById("verify_status");
+
+      if (!receipt || !ballot_hash) {
+        status.innerText = "Please enter both receipt and ballot hash.";
+        return;
+      }
+
+      try {
+        const res = await fetch("/api/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ receipt, ballot_hash })
+        });
+
+        const data = await res.json();
+
+        if (data.status === "verified") {
+          status.innerText = "✓ Verified! Your ballot is on the board.";
+          status.style.color = "green";
+        } else {
+          status.innerText = "✗ Verification failed: " + data.message;
+          status.style.color = "red";
+        }
+      } catch (err) {
+        status.innerText = "Error verifying ballot.";
+      }
+    }
+
+    // NEW: Auto-load saved receipt/hash
+    window.addEventListener("load", () => {
+      const saved_receipt = localStorage.getItem("vote_receipt");
+      const saved_hash = localStorage.getItem("ballot_hash");
+      if (saved_receipt) document.getElementById("verify_receipt").value = saved_receipt;
+      if (saved_hash) document.getElementById("verify_hash").value = saved_hash;
+    });
+  </script>
 </body>
 </html>

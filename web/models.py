@@ -11,9 +11,7 @@ class User(db.Model, UserMixin):
     
 class Vote(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-
-    # user_id = db.Column(db.Integer, db.ForeignKey("user.id"), unique=True)
     token_hash = db.Column(db.String(256), unique=True, nullable=False)
     timestamp = db.Column(db.DateTime, default=db.func.now())
-
     ballot_hash = db.Column(db.String(256))
+    ballot_hash_digest = db.Column(db.String(64))  # NEW: hash of the ciphertext

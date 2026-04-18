@@ -90,11 +90,17 @@ async function castVote(vote) {
 
     if (data.status === "accepted") {
       const receipt = data.receipt;
+      const ballot_hash = data.ballot_hash;  // NEW
 
       localStorage.setItem("vote_receipt", receipt);
+      localStorage.setItem("ballot_hash", ballot_hash);  // NEW
 
       status.innerText = "Vote accepted!";
-      alert("Vote cast! Save this receipt: " + receipt);
+      alert(
+        "Vote cast! Save this receipt:\n\n" +
+        "Receipt: " + receipt + "\n" +
+        "Ballot Hash: " + ballot_hash  // NEW
+      );
     } else {
       status.innerText = "Vote rejected.";
     }
