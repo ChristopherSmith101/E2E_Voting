@@ -1,6 +1,8 @@
 # E2E Voting Prototype System
 
-A work-inprogress, the current implementation is a simplified end-to-end verifiable (E2E-V) voting system. It demonstrates the core concepts of secure electronic voting, including client-side encryption, token-based authentication, and public ballot verification. Uses python and javascript via a flask app.
+A work-inprogress, the current implementation is a simplified end-to-end verifiable (E2E-V) voting system. It demonstrates the core concepts of secure electronic voting, including client-side encryption, Google Autherntication for login, token-based authentication for voting, and public ballot verification. Uses python and javascript via a flask app.
+
+It is worth noting that if this were in the real world, eligible voters would be asked to submit their google accounts to the administrator, who would then add them to a list of people in order to prevent multiple different google accounts from one person voting. This would also prevent random people who shouldn't be voting from gaining access.
 
 As of right now, changes must be made to every security property mentioned under the project 2 design instructions. The following are necessary security properties:
 - secure authentication before voting       Done
@@ -8,7 +10,7 @@ As of right now, changes must be made to every security property mentioned under
 - individual verifiability                  Done
 - universal verifiability                   Done
 - anti-coercion                             Done
-- integrity                                 Weak (needs to be changed)
+- integrity                                 Weak (each person gets 1 vote and can't change it)
 
 ---
 
@@ -65,32 +67,33 @@ The system is split into three main components:
 
 This system implements simplified versions of:
 
-- **Authentication**: One-time voting tokens
+- **Authentication**: One-time voting tokens + Google OAuth
 - **Ballot Encryption**: Client-side encryption
-- **Integrity Checking**: Proof validation for ballot structure (needs to be updated to better implementation)
+- **Integrity Checking**: Proof validation for ballot structure 
 - **Single Voting Enforcement**: Tokens are consumed after use (could discuss about changing original votes in the future)
-- **Transparency**: All ballots are stored on a public bulletin board (currently not shown in the application)
+- **Transparency**: All ballots are stored on a public bulletin board
 
-⚠️ Note: Cryptographic components are simplified and must be changed.
+⚠️ Note: Cryptographic components are simplified and must be changed if deployed for real.
 
 ---
 
 ## 🔁 Voting Flow
 
 1. User opens the voting webpage
-2. Browser requests:
+2. User logs into their google account and then clicks on "Start Voting"
+3. Browser requests:
    - Public key (`/api/public_key`)
    - Voting token (`/api/token`)
-3. User selects a vote (YES/NO)
-4. Browser:
+4. User selects a vote (YES/NO)
+5. Browser:
    - Encrypts vote locally
    - Generates proof (simplified)
-5. Encrypted ballot is sent to server (`/api/vote`)
-6. Server:
+6. Encrypted ballot is sent to server (`/api/vote`)
+7. Server:
    - Validates token (single-use)
    - Verifies proof
    - Stores ballot on bulletin board
-7. Ballot becomes publicly visible
+8. Ballot becomes publicly visible
 
 ---
 
